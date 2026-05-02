@@ -1,8 +1,163 @@
 {% extends "base.html" %}{% block content %}
-<div class="card auto"><h2>{% if edit %}EDITANDO ORÇAMENTO #{{edit.id}}{% else %}NOVO ORÇAMENTO{% endif %}</h2><form method="post"><input type="hidden" name="edit_id" value="{{edit.id if edit else ''}}">
-<div class="grid"><div><label>CLIENTE</label><select name="cliente_id">{% for c in clientes %}<option value="{{c.id}}" {% if edit and edit.cliente_id==c.id %}selected{% endif %}>{{c.nome}}</option>{% endfor %}</select></div><div><label>VEÍCULO</label><select name="veiculo_id">{% for v in veiculos %}<option value="{{v.id}}" {% if edit and edit.veiculo_id==v.id %}selected{% endif %}>{{v.cliente}} - {{v.modelo}} {{v.placa}}</option>{% endfor %}</select></div><div><label>DATA</label><input type="date" name="data" value="{{edit.data if edit else ''}}"></div><div><label>STATUS</label><select name="status"><option>ABERTO</option><option>APROVADO</option><option>FINALIZADO</option><option>CANCELADO</option></select></div></div>
-<label>DESCRIÇÃO GERAL</label><textarea name="descricao">{{edit.descricao if edit else ''}}</textarea>
-<div class="grid"><div><label>PEÇAS</label><textarea name="pecas_desc">{{edit.pecas_desc if edit else ''}}</textarea><label>VALOR DAS PEÇAS</label><input name="pecas_valor" value="{{edit.pecas_valor if edit else '0'}}"></div><div><label>MÃO DE OBRA</label><textarea name="mao_obra_desc">{{edit.mao_obra_desc if edit else ''}}</textarea><label>VALOR DA MÃO DE OBRA</label><input name="mao_obra_valor" value="{{edit.mao_obra_valor if edit else '0'}}"></div></div>
-<div class="grid"><div><label>DESCONTO</label><input name="desconto" value="{{edit.desconto if edit else '0'}}"></div><div><label>ACRÉSCIMO</label><input name="acrescimo" value="{{edit.acrescimo if edit else '0'}}"></div><div><label>PAGAMENTO</label><select name="pagamento"><option>PIX</option><option>DINHEIRO</option><option>DÉBITO</option><option>CRÉDITO</option></select></div><div><label>PARCELAS</label><input type="number" name="parcelas" min="1" value="{{edit.parcelas if edit else '1'}}"></div><div><label>PRIMEIRA PARCELA</label><input type="date" name="primeira_parcela" value="{{edit.primeira_parcela if edit else ''}}"></div></div>
-<label>OBSERVAÇÕES</label><textarea name="observacoes">{{edit.observacoes if edit else ''}}</textarea><button>{% if edit %}ATUALIZAR ORÇAMENTO{% else %}SALVAR ORÇAMENTO{% endif %}</button></form></div>
-<div class="card"><h2>ORÇAMENTOS SALVOS</h2><table><tr><th>ID</th><th>CLIENTE</th><th>VEÍCULO</th><th>PAGAMENTO</th><th>TOTAL</th><th>AÇÕES</th></tr>{% for o in orcamentos %}<tr><td>#{{o.id}}</td><td>{{o.cliente}}</td><td>{{o.carro}} {{o.placa}}</td><td>{{o.pagamento}} {{o.parcelas}}x</td><td>{{brl(o.total)}}</td><td><a class="btn" href="/orcamentos/editar/{{o.id}}">EDITAR</a><a class="btn dark" href="/orcamentos/pdf/{{o.id}}">PDF</a><a class="btn green" href="/orcamentos/whatsapp/{{o.id}}">WHATSAPP</a><a class="btn gray" href="/orcamentos/excluir/{{o.id}}" onclick="return confirm('EXCLUIR ORÇAMENTO?')">EXCLUIR</a></td></tr>{% endfor %}</table></div>{% endblock %}
+<div class="card auto">
+  <h2>{% if edit %}EDITANDO ORÇAMENTO #{{edit.id}}{% else %}NOVO ORÇAMENTO{% endif %}</h2>
+
+  <form method="post" id="formOrc">
+    <input type="hidden" name="edit_id" value="{{edit.id if edit else ''}}">
+
+    <div class="grid">
+      <div>
+        <label>CLIENTE</label>
+        <select name="cliente_id">{% for c in clientes %}<option value="{{c.id}}" {% if edit and edit.cliente_id==c.id %}selected{% endif %}>{{c.nome}}</option>{% endfor %}</select>
+      </div>
+      <div>
+        <label>VEÍCULO</label>
+        <select name="veiculo_id">{% for v in veiculos %}<option value="{{v.id}}" {% if edit and edit.veiculo_id==v.id %}selected{% endif %}>{{v.cliente}} - {{v.modelo}} {{v.placa}}</option>{% endfor %}</select>
+      </div>
+      <div><label>DATA</label><input type="date" name="data" value="{{edit.data if edit else ''}}"></div>
+      <div><label>STATUS</label><select name="status"><option>ABERTO</option><option>APROVADO</option><option>FINALIZADO</option><option>CANCELADO</option></select></div>
+    </div>
+
+    <label>DESCRIÇÃO GERAL</label>
+    <textarea name="descricao">{{edit.descricao if edit else ''}}</textarea>
+
+    <h2>PEÇAS DO ORÇAMENTO</h2>
+    <p class="muted">ADICIONE PEÇA POR PEÇA. O SISTEMA CALCULA TUDO AUTOMATICAMENTE.</p>
+
+    <div style="overflow:auto">
+      <table id="tabelaItens">
+        <tr><th>PEÇA / DESCRIÇÃO</th><th>QTD</th><th>VALOR UNITÁRIO</th><th>TOTAL</th><th>AÇÃO</th></tr>
+        {% if itens_edit %}
+          {% for item in itens_edit %}
+          <tr class="linha-item">
+            <td><input name="item_desc[]" value="{{item.descricao}}"></td>
+            <td><input name="item_qtd[]" class="qtd" value="{{item.quantidade}}"></td>
+            <td><input name="item_valor[]" class="valor" value="{{item.valor_unitario}}"></td>
+            <td class="totalItem">{{brl(item.total)}}</td>
+            <td><button type="button" class="gray" onclick="removerLinha(this)">REMOVER</button></td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr class="linha-item">
+            <td><input name="item_desc[]" placeholder="EX: FILTRO DE ÓLEO"></td>
+            <td><input name="item_qtd[]" class="qtd" value="1"></td>
+            <td><input name="item_valor[]" class="valor" value="0"></td>
+            <td class="totalItem">R$ 0,00</td>
+            <td><button type="button" class="gray" onclick="removerLinha(this)">REMOVER</button></td>
+          </tr>
+        {% endif %}
+      </table>
+    </div>
+
+    <button type="button" class="dark" onclick="adicionarLinha()">+ ADICIONAR PEÇA</button>
+
+    <div class="grid">
+      <div>
+        <label>MÃO DE OBRA / SERVIÇOS</label>
+        <textarea name="mao_obra_desc">{{edit.mao_obra_desc if edit else ''}}</textarea>
+        <label>VALOR DA MÃO DE OBRA</label>
+        <input name="mao_obra_valor" id="maoObra" value="{{edit.mao_obra_valor if edit else '0'}}">
+      </div>
+
+      <div class="card">
+        <h2>RESUMO AUTOMÁTICO</h2>
+        <p>PEÇAS: <b id="totalPecas">R$ 0,00</b></p>
+        <p>MÃO DE OBRA: <b id="totalMao">R$ 0,00</b></p>
+        <p>DESCONTO: <b id="totalDesconto">R$ 0,00</b></p>
+        <p>ACRÉSCIMO: <b id="totalAcrescimo">R$ 0,00</b></p>
+        <p class="total">TOTAL: <span id="totalGeral">R$ 0,00</span></p>
+        <p>PARCELA: <b id="valorParcela">R$ 0,00</b></p>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div><label>DESCONTO</label><input name="desconto" id="desconto" value="{{edit.desconto if edit else '0'}}"></div>
+      <div><label>ACRÉSCIMO</label><input name="acrescimo" id="acrescimo" value="{{edit.acrescimo if edit else '0'}}"></div>
+      <div><label>PAGAMENTO</label><select name="pagamento"><option>PIX</option><option>DINHEIRO</option><option>DÉBITO</option><option>CRÉDITO</option></select></div>
+      <div><label>PARCELAS</label><input type="number" name="parcelas" id="parcelas" min="1" value="{{edit.parcelas if edit else '1'}}"></div>
+      <div><label>PRIMEIRA PARCELA</label><input type="date" name="primeira_parcela" value="{{edit.primeira_parcela if edit else ''}}"></div>
+    </div>
+
+    <label>OBSERVAÇÕES</label>
+    <textarea name="observacoes">{{edit.observacoes if edit else ''}}</textarea>
+
+    <button>{% if edit %}ATUALIZAR ORÇAMENTO{% else %}SALVAR ORÇAMENTO{% endif %}</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>ORÇAMENTOS SALVOS</h2>
+  <table>
+    <tr><th>ID</th><th>CLIENTE</th><th>VEÍCULO</th><th>PAGAMENTO</th><th>TOTAL</th><th>AÇÕES</th></tr>
+    {% for o in orcamentos %}
+    <tr>
+      <td>#{{o.id}}</td>
+      <td>{{o.cliente}}</td>
+      <td>{{o.carro}} {{o.placa}}</td>
+      <td>{{o.pagamento}} {{o.parcelas}}x</td>
+      <td>{{brl(o.total)}}</td>
+      <td>
+        <a class="btn" href="/orcamentos/editar/{{o.id}}">EDITAR</a>
+        <a class="btn dark" href="/orcamentos/pdf/{{o.id}}">PDF</a>
+        <a class="btn green" href="/orcamentos/whatsapp/{{o.id}}">WHATSAPP</a>
+        <a class="btn dark" href="/ordens-servico?orcamento={{o.id}}">GERAR OS</a>
+        <a class="btn gray" href="/orcamentos/excluir/{{o.id}}" onclick="return confirm('EXCLUIR ORÇAMENTO?')">EXCLUIR</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<script>
+function numero(v){
+  v = (v || "0").toString().replaceAll(".", "").replace(",", ".");
+  let n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+}
+function brl(v){
+  return v.toLocaleString("pt-BR", {style:"currency", currency:"BRL"});
+}
+function recalcular(){
+  let totalPecas = 0;
+  document.querySelectorAll(".linha-item").forEach(tr=>{
+    let qtd = numero(tr.querySelector(".qtd").value);
+    let val = numero(tr.querySelector(".valor").value);
+    let total = qtd * val;
+    tr.querySelector(".totalItem").innerText = brl(total);
+    totalPecas += total;
+  });
+  let mao = numero(document.getElementById("maoObra").value);
+  let desconto = numero(document.getElementById("desconto").value);
+  let acrescimo = numero(document.getElementById("acrescimo").value);
+  let parcelas = Math.max(1, parseInt(document.getElementById("parcelas").value || "1"));
+  let geral = totalPecas + mao - desconto + acrescimo;
+  document.getElementById("totalPecas").innerText = brl(totalPecas);
+  document.getElementById("totalMao").innerText = brl(mao);
+  document.getElementById("totalDesconto").innerText = brl(desconto);
+  document.getElementById("totalAcrescimo").innerText = brl(acrescimo);
+  document.getElementById("totalGeral").innerText = brl(geral);
+  document.getElementById("valorParcela").innerText = parcelas + "x DE " + brl(geral/parcelas);
+}
+function adicionarLinha(){
+  let tabela = document.getElementById("tabelaItens");
+  let tr = document.createElement("tr");
+  tr.className = "linha-item";
+  tr.innerHTML = '<td><input name="item_desc[]" placeholder="EX: PASTILHA DE FREIO"></td><td><input name="item_qtd[]" class="qtd" value="1"></td><td><input name="item_valor[]" class="valor" value="0"></td><td class="totalItem">R$ 0,00</td><td><button type="button" class="gray" onclick="removerLinha(this)">REMOVER</button></td>';
+  tabela.appendChild(tr);
+  ativarEventos();
+}
+function removerLinha(btn){
+  let linhas = document.querySelectorAll(".linha-item");
+  if(linhas.length > 1){ btn.closest("tr").remove(); }
+  recalcular();
+}
+function ativarEventos(){
+  document.querySelectorAll("input, textarea, select").forEach(el=>{
+    el.oninput = recalcular;
+    el.onchange = recalcular;
+  });
+}
+ativarEventos();
+recalcular();
+</script>
+{% endblock %}

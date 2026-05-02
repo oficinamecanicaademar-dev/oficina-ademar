@@ -1,0 +1,47 @@
+{% extends "base.html" %}{% block content %}
+<div class="card auto">
+  <h2>NOVA ORDEM DE SERVIÇO</h2>
+  <form method="post">
+    <div class="grid">
+      <div>
+        <label>VINCULAR ORÇAMENTO</label>
+        <select name="orcamento_id">
+          <option value="">SEM ORÇAMENTO</option>
+          {% for o in orcamentos %}
+          <option value="{{o.id}}" {% if request.args.get('orcamento') and request.args.get('orcamento')|int == o.id %}selected{% endif %}>#{{o.id}} - {{o.cliente}} - {{o.carro}} {{o.placa}}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div><label>CLIENTE</label><select name="cliente_id">{% for c in clientes %}<option value="{{c.id}}">{{c.nome}}</option>{% endfor %}</select></div>
+      <div><label>VEÍCULO</label><select name="veiculo_id">{% for v in veiculos %}<option value="{{v.id}}">{{v.cliente}} - {{v.modelo}} {{v.placa}}</option>{% endfor %}</select></div>
+      <div><label>DATA ABERTURA</label><input type="date" name="data_abertura"></div>
+      <div><label>DATA FECHAMENTO</label><input type="date" name="data_fechamento"></div>
+      <div><label>STATUS</label><select name="status"><option>EM ANDAMENTO</option><option>AGUARDANDO PEÇA</option><option>FINALIZADO</option><option>ENTREGUE</option><option>CANCELADO</option></select></div>
+    </div>
+    <label>DESCRIÇÃO DO SERVIÇO</label><textarea name="descricao"></textarea>
+    <label>OBSERVAÇÕES</label><textarea name="observacoes"></textarea>
+    <button>SALVAR ORDEM DE SERVIÇO</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>ORDENS DE SERVIÇO</h2>
+  <table>
+    <tr><th>ID</th><th>CLIENTE</th><th>VEÍCULO</th><th>ABERTURA</th><th>STATUS</th><th>AÇÕES</th></tr>
+    {% for os in lista %}
+    <tr>
+      <td>#{{os.id}}</td>
+      <td>{{os.cliente}}</td>
+      <td>{{os.carro}} {{os.placa}}</td>
+      <td>{{os.data_abertura}}</td>
+      <td><span class="badge">{{os.status}}</span></td>
+      <td>
+        <a class="btn green" href="/ordens-servico/status/{{os.id}}/FINALIZADO">FINALIZAR</a>
+        <a class="btn dark" href="/ordens-servico/status/{{os.id}}/ENTREGUE">ENTREGUE</a>
+        <a class="btn gray" href="/ordens-servico/excluir/{{os.id}}" onclick="return confirm('EXCLUIR ORDEM DE SERVIÇO?')">EXCLUIR</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

@@ -122,6 +122,32 @@ def init_db():
             status VARCHAR(40)
         );
         """))
+
+        con.execute(text(f"""
+        CREATE TABLE IF NOT EXISTS orcamento_itens(
+            id {pk},
+            orcamento_id INTEGER,
+            tipo VARCHAR(30),
+            descricao TEXT,
+            quantidade FLOAT,
+            valor_unitario FLOAT,
+            total FLOAT
+        );
+        """))
+        con.execute(text(f"""
+        CREATE TABLE IF NOT EXISTS ordens_servico(
+            id {pk},
+            orcamento_id INTEGER,
+            cliente_id INTEGER,
+            veiculo_id INTEGER,
+            data_abertura VARCHAR(20),
+            data_fechamento VARCHAR(20),
+            status VARCHAR(40),
+            descricao TEXT,
+            observacoes TEXT
+        );
+        """))
+
         row = con.execute(text("SELECT id FROM usuarios WHERE usuario=:u"), {"u": ADMIN_USER}).fetchone()
         if not row:
             con.execute(text("INSERT INTO usuarios(usuario,senha_hash) VALUES(:u,:s)"),
@@ -242,40 +268,73 @@ def recalcular_parcelas(orc_id):
                 {"data": venc.strftime("%Y-%m-%d"), "descricao": f"ORÇAMENTO #{orc_id} - PARCELA {i+1}/{parcelas}",
                  "valor": valor_parcela, "forma": o["pagamento"], "orc": orc_id, "num": i+1, "total": parcelas})
 
+
+def salvar_itens_orcamento(orc_id, form):
+    execute("DELETE FROM orcamento_itens WHERE orcamento_id=:id", {"id": orc_id})
+    descs = form.getlist("item_desc[]")
+    qtds = form.getlist("item_qtd[]")
+    vals = form.getlist("item_valor[]")
+    total_pecas = 0.0
+
+    for desc, qtd, val in zip(descs, qtds, vals):
+        desc = normalizar(desc)
+        qtd = money(qtd)
+        val = money(val)
+        total = qtd * val
+        if desc and total > 0:
+            execute("""INSERT INTO orcamento_itens(orcamento_id,tipo,descricao,quantidade,valor_unitario,total)
+                       VALUES(:orc,'PEÇA',:desc,:qtd,:val,:total)""",
+                    {"orc": orc_id, "desc": desc, "qtd": qtd, "val": val, "total": total})
+            total_pecas += total
+    return total_pecas
+
+def carregar_itens(orc_id):
+    if not orc_id:
+        return []
+    return fetchall("SELECT * FROM orcamento_itens WHERE orcamento_id=:id ORDER BY id", {"id": orc_id})
+
+def base_url():
+    return request.url_root.rstrip("/")
+
 @app.route("/orcamentos", methods=["GET","POST"])
 @app.route("/orcamentos/editar/<int:edit_id>", methods=["GET","POST"])
 @login_required
 def orcamentos(edit_id=None):
     if request.method == "POST":
-        pecas = money(request.form.get("pecas_valor"))
         mao = money(request.form.get("mao_obra_valor"))
         desconto = money(request.form.get("desconto"))
         acrescimo = money(request.form.get("acrescimo"))
-        total = pecas + mao - desconto + acrescimo
         parcelas = max(1, int(request.form.get("parcelas") or 1))
-        valor_parcela = round(total / parcelas, 2)
+
         params = {
-            "cliente_id": request.form["cliente_id"], "veiculo_id": request.form["veiculo_id"],
+            "cliente_id": request.form["cliente_id"],
+            "veiculo_id": request.form["veiculo_id"],
             "data": request.form.get("data") or datetime.now().strftime("%Y-%m-%d"),
             "status": normalizar(request.form.get("status","ABERTO")),
             "descricao": normalizar(request.form.get("descricao","")),
-            "pecas_desc": normalizar(request.form.get("pecas_desc","")),
-            "pecas_valor": pecas, "mao_obra_desc": normalizar(request.form.get("mao_obra_desc","")),
-            "mao_obra_valor": mao, "desconto": desconto, "acrescimo": acrescimo, "total": total,
+            "pecas_desc": "",
+            "pecas_valor": 0,
+            "mao_obra_desc": normalizar(request.form.get("mao_obra_desc","")),
+            "mao_obra_valor": mao,
+            "desconto": desconto,
+            "acrescimo": acrescimo,
+            "total": 0,
             "pagamento": normalizar(request.form.get("pagamento","NÃO INFORMADO")),
-            "parcelas": parcelas, "valor_parcela": valor_parcela,
+            "parcelas": parcelas,
+            "valor_parcela": 0,
             "primeira_parcela": request.form.get("primeira_parcela") or datetime.now().strftime("%Y-%m-%d"),
             "observacoes": normalizar(request.form.get("observacoes","")),
         }
+
         if request.form.get("edit_id"):
-            params["id"] = int(request.form["edit_id"])
+            oid = int(request.form["edit_id"])
+            params["id"] = oid
             execute("""UPDATE orcamentos SET cliente_id=:cliente_id, veiculo_id=:veiculo_id, data=:data, status=:status,
                        descricao=:descricao, pecas_desc=:pecas_desc, pecas_valor=:pecas_valor,
                        mao_obra_desc=:mao_obra_desc, mao_obra_valor=:mao_obra_valor,
                        desconto=:desconto, acrescimo=:acrescimo, total=:total, pagamento=:pagamento,
                        parcelas=:parcelas, valor_parcela=:valor_parcela, primeira_parcela=:primeira_parcela,
                        observacoes=:observacoes WHERE id=:id""", params)
-            oid = params["id"]
         else:
             with engine.begin() as con:
                 result = con.execute(text("""INSERT INTO orcamentos(cliente_id,veiculo_id,data,status,descricao,pecas_desc,pecas_valor,
@@ -283,6 +342,13 @@ def orcamentos(edit_id=None):
                     VALUES(:cliente_id,:veiculo_id,:data,:status,:descricao,:pecas_desc,:pecas_valor,:mao_obra_desc,:mao_obra_valor,
                     :desconto,:acrescimo,:total,:pagamento,:parcelas,:valor_parcela,:primeira_parcela,:observacoes) RETURNING id"""), params)
                 oid = result.scalar()
+
+        total_pecas = salvar_itens_orcamento(oid, request.form)
+        total = total_pecas + mao - desconto + acrescimo
+        valor_parcela = round(total / parcelas, 2)
+        execute("""UPDATE orcamentos SET pecas_valor=:pecas, total=:total, valor_parcela=:vp WHERE id=:id""",
+                {"pecas": total_pecas, "total": total, "vp": valor_parcela, "id": oid})
+
         recalcular_parcelas(oid)
         return redirect(url_for("orcamentos"))
 
@@ -295,12 +361,15 @@ def orcamentos(edit_id=None):
                         LEFT JOIN veiculos v ON v.id=o.veiculo_id
                         ORDER BY o.id DESC""")
     edit = fetchone("SELECT * FROM orcamentos WHERE id=:id", {"id": edit_id}) if edit_id else None
-    return render_template("orcamentos.html", clientes=clientes, veiculos=veiculos, orcamentos=lista, edit=edit)
+    itens_edit = carregar_itens(edit_id) if edit_id else []
+    return render_template("orcamentos.html", clientes=clientes, veiculos=veiculos, orcamentos=lista, edit=edit, itens_edit=itens_edit)
 
 @app.route("/orcamentos/excluir/<int:id>")
 @login_required
 def excluir_orcamento(id):
     execute("DELETE FROM financeiro WHERE orcamento_id=:id", {"id": id})
+    execute("DELETE FROM orcamento_itens WHERE orcamento_id=:id", {"id": id})
+    execute("DELETE FROM ordens_servico WHERE orcamento_id=:id", {"id": id})
     execute("DELETE FROM orcamentos WHERE id=:id", {"id": id})
     return redirect(url_for("orcamentos"))
 
@@ -318,6 +387,7 @@ def pdf_orcamento(id):
     o = get_orcamento(id)
     if not o:
         return "ORÇAMENTO NÃO ENCONTRADO", 404
+    itens = carregar_itens(id)
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     w,h = A4
@@ -361,17 +431,33 @@ def pdf_orcamento(id):
     y -= 0.2*cm
 
     section("PEÇAS E MÃO DE OBRA")
-    rows = [("PEÇAS", o["pecas_desc"], o["pecas_valor"]), ("MÃO DE OBRA", o["mao_obra_desc"], o["mao_obra_valor"])]
-    for titulo, desc, valor in rows:
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(2*cm, y, titulo)
-        c.drawRightString(w-2*cm, y, brl(valor))
-        y -= 0.45*cm
-        c.setFont("Helvetica", 9)
-        for line in (desc or "-").split("\n"):
-            c.drawString(2.2*cm, y, line[:100])
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(2*cm, y, "PEÇAS")
+    c.drawRightString(w-2*cm, y, brl(o["pecas_valor"]))
+    y -= 0.45*cm
+    c.setFont("Helvetica", 9)
+    if itens:
+        for item in itens:
+            linha = f"{item['descricao']} | QTD: {item['quantidade']} | UNIT.: {brl(item['valor_unitario'])} | TOTAL: {brl(item['total'])}"
+            c.drawString(2.2*cm, y, linha[:115])
             y -= 0.35*cm
-        y -= 0.25*cm
+            if y < 4*cm:
+                c.showPage()
+                y = h-2*cm
+    else:
+        c.drawString(2.2*cm, y, "-")
+        y -= 0.35*cm
+    y -= 0.25*cm
+
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(2*cm, y, "MÃO DE OBRA")
+    c.drawRightString(w-2*cm, y, brl(o["mao_obra_valor"]))
+    y -= 0.45*cm
+    c.setFont("Helvetica", 9)
+    for line in (o["mao_obra_desc"] or "-").split("\n"):
+        c.drawString(2.2*cm, y, line[:100])
+        y -= 0.35*cm
+    y -= 0.25*cm
 
     section("PAGAMENTO E TOTAL")
     c.setFont("Helvetica", 10)
@@ -408,19 +494,78 @@ def whatsapp(id):
     o = get_orcamento(id)
     if not o:
         return redirect(url_for("orcamentos"))
+
     numero = "".join(ch for ch in (o["telefone"] or "") if ch.isdigit())
+    pdf_link = f"{base_url()}/orcamentos/pdf/{id}"
+
     msg = f"""Olá, {o['cliente']}! 👋
 
-Aqui é da Auto Mecânica Ademar 🔧🚗
+Aqui é da *Auto Mecânica Ademar* 🔧🚗
 
-Segue o orçamento do seu veículo {o['carro']} - placa {o['placa']}.
+Preparamos o orçamento do seu veículo:
 
-💰 Total: {brl(o['total'])}
-💳 Pagamento: {o['pagamento']} - {o['parcelas']}x de {brl(o['valor_parcela'])}
+🚘 *Veículo:* {o['carro']} - {o['placa']}
 
-Qualquer dúvida estou à disposição.
-Agradecemos a confiança! 🤝"""
-    return redirect("https://wa.me/55" + numero + "?text=" + urllib.parse.quote(msg))
+💰 *Valor total:* {brl(o['total'])}
+💳 *Forma de pagamento:* {o['pagamento']}
+📊 *Parcelamento:* {o['parcelas']}x de {brl(o['valor_parcela'])}
+
+📄 *Orçamento completo em PDF:*
+{pdf_link}
+
+Caso queira aprovar o serviço, é só responder esta mensagem 👍
+
+Agradecemos pela confiança! 🤝
+*Auto Mecânica Ademar*
+_Mecânica em geral_"""
+
+    return redirect("https://wa.me/55" + numero + "?text=" + urllib.parse.quote(msg, safe=""))
+
+
+@app.route("/ordens-servico", methods=["GET","POST"])
+@login_required
+def ordens_servico():
+    if request.method == "POST":
+        orc_id = request.form.get("orcamento_id") or None
+        orc = fetchone("SELECT * FROM orcamentos WHERE id=:id", {"id": orc_id}) if orc_id else None
+        cliente_id = orc["cliente_id"] if orc else request.form.get("cliente_id")
+        veiculo_id = orc["veiculo_id"] if orc else request.form.get("veiculo_id")
+
+        execute("""INSERT INTO ordens_servico(orcamento_id,cliente_id,veiculo_id,data_abertura,data_fechamento,status,descricao,observacoes)
+                   VALUES(:orc,:cli,:vei,:abertura,:fechamento,:status,:descricao,:obs)""",
+                {"orc": orc_id, "cli": cliente_id, "vei": veiculo_id,
+                 "abertura": request.form.get("data_abertura") or datetime.now().strftime("%Y-%m-%d"),
+                 "fechamento": request.form.get("data_fechamento") or "",
+                 "status": normalizar(request.form.get("status","EM ANDAMENTO")),
+                 "descricao": normalizar(request.form.get("descricao","")),
+                 "obs": normalizar(request.form.get("observacoes",""))})
+        return redirect(url_for("ordens_servico"))
+
+    clientes = fetchall("SELECT * FROM clientes ORDER BY nome")
+    veiculos = fetchall("""SELECT v.*, c.nome cliente FROM veiculos v LEFT JOIN clientes c ON c.id=v.cliente_id ORDER BY c.nome""")
+    orcamentos_lista = fetchall("""SELECT o.*, c.nome cliente, v.modelo carro, v.placa placa FROM orcamentos o
+                                  LEFT JOIN clientes c ON c.id=o.cliente_id
+                                  LEFT JOIN veiculos v ON v.id=o.veiculo_id
+                                  ORDER BY o.id DESC LIMIT 200""")
+    lista = fetchall("""SELECT os.*, c.nome cliente, v.modelo carro, v.placa placa
+                        FROM ordens_servico os
+                        LEFT JOIN clientes c ON c.id=os.cliente_id
+                        LEFT JOIN veiculos v ON v.id=os.veiculo_id
+                        ORDER BY os.id DESC""")
+    return render_template("ordens_servico.html", lista=lista, clientes=clientes, veiculos=veiculos, orcamentos=orcamentos_lista)
+
+@app.route("/ordens-servico/excluir/<int:id>")
+@login_required
+def excluir_os(id):
+    execute("DELETE FROM ordens_servico WHERE id=:id", {"id": id})
+    return redirect(url_for("ordens_servico"))
+
+@app.route("/ordens-servico/status/<int:id>/<status>")
+@login_required
+def status_os(id, status):
+    execute("UPDATE ordens_servico SET status=:status WHERE id=:id", {"status": normalizar(status), "id": id})
+    return redirect(url_for("ordens_servico"))
+
 
 @app.route("/financeiro", methods=["GET","POST"])
 @login_required
@@ -466,8 +611,14 @@ def relatorios():
                         GROUP BY substr(data,1,7) ORDER BY mes""", {"ano": ano})
     parcelas = fetchall("""SELECT * FROM financeiro WHERE tipo='ENTRADA' AND status='PENDENTE'
                            ORDER BY data ASC LIMIT 100""")
+    chart_labels = [r["mes"] for r in anual]
+    chart_values = [float(r["saldo"] or 0) for r in anual]
+    formas_labels = [str(r["forma"]) + " " + str(r["status"]) for r in mensal]
+    formas_values = [float(r["total"] or 0) for r in mensal]
     return render_template("relatorios.html", mensal=mensal, anual=anual, parcelas=parcelas,
-                           entradas=entradas, saidas=saidas, lucro=entradas-saidas, ano=ano, mes=mes)
+                           entradas=entradas, saidas=saidas, lucro=entradas-saidas, ano=ano, mes=mes,
+                           chart_labels=chart_labels, chart_values=chart_values,
+                           formas_labels=formas_labels, formas_values=formas_values)
 
 if __name__ == "__main__":
     app.run(debug=True)
