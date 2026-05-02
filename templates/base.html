@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AUTO MECÂNICA ADEMAR</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+{% if session.get("logado") %}
+<header class="top">
+  <div class="brand">
+    <div class="logo">🚗</div>
+    <div>
+      <h1>AUTO MECÂNICA ADEMAR</h1>
+      <p>MECÂNICA EM GERAL</p>
+    </div>
+  </div>
+  <nav>
+    <a href="/">INÍCIO</a><a href="/clientes">CLIENTES</a><a href="/veiculos">VEÍCULOS</a>
+    <a href="/orcamentos">ORÇAMENTOS</a><a href="/financeiro">FINANCEIRO</a><a href="/relatorios">RELATÓRIOS</a>
+    <a href="/logout">SAIR</a>
+  </nav>
+</header>
+{% endif %}
+<main class="wrap">{% block content %}{% endblock %}</main>
+<script>
+document.querySelectorAll('input[type=text], textarea').forEach(el=>{
+  el.addEventListener('input',()=>{ let p=el.selectionStart; el.value=el.value.toUpperCase(); el.selectionStart=el.selectionEnd=p; });
+});
+</script>
+</body></html>

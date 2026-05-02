@@ -1,0 +1,13 @@
+:root{--dark:#252b30;--red:#a94343;--bg:#f1f2f3;--card:#fff;--soft:#efe4e4}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#f1f2f3,#faf8f6);font-family:Segoe UI,Arial,sans-serif;color:#222}
+.top{background:var(--dark);color:#fff;padding:18px 24px;border-bottom:5px solid var(--red);box-shadow:0 6px 24px #0003}
+.brand{display:flex;gap:14px;align-items:center}.logo{width:70px;height:70px;border:3px solid var(--red);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:35px;background:#1c2024}
+.brand h1{margin:0;font-size:26px;letter-spacing:1px}.brand p{margin:4px 0;color:#f2dede;font-weight:800;letter-spacing:2px}
+nav{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}nav a{color:white;text-decoration:none;background:#374049;padding:10px 14px;border-radius:16px;font-weight:800;font-size:13px}nav a:hover{background:var(--red)}
+.wrap{max-width:1180px;margin:24px auto;padding:0 16px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}.card{background:var(--card);border-radius:24px;padding:20px;box-shadow:0 8px 28px #27313b18;border:1px solid #ddd;margin-bottom:16px}.auto{border-left:7px solid var(--red);background:linear-gradient(90deg,#fff,#f7eeee)}
+h2{margin-top:0;color:var(--dark)}.badge{display:inline-block;background:var(--soft);color:#692f2f;padding:6px 10px;border-radius:999px;font-weight:900}
+label{font-size:12px;font-weight:900;color:#4b4f54;margin-top:10px;display:block}input,select,textarea{width:100%;padding:12px;border:1px solid #d1d4d7;border-radius:14px;margin-top:5px;background:#fbfbfb;font-size:15px}textarea{min-height:90px}
+button,.btn{border:0;background:var(--red);color:white;padding:11px 14px;border-radius:14px;text-decoration:none;font-weight:900;display:inline-block;margin:4px 2px;cursor:pointer}.dark{background:var(--dark)}.gray{background:#6b7075}.green{background:#2f795b}
+table{width:100%;border-collapse:collapse;background:white;border-radius:18px;overflow:hidden}th{background:var(--dark);color:white;text-align:left}td,th{padding:10px;border-bottom:1px solid #eee;font-size:14px}.total{font-size:28px;font-weight:900;color:var(--red)}.muted{color:#777}
+.login{max-width:430px;margin:9vh auto}.login .logo{margin:auto}
+@media(max-width:700px){.brand h1{font-size:18px}.brand p{font-size:12px}.logo{width:54px;height:54px}nav a{flex:1;text-align:center}.wrap{margin:12px auto}.card{padding:14px}td,th{font-size:12px;padding:7px}}
