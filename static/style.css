@@ -14,3 +14,22 @@ table{width:100%;border-collapse:collapse;background:white;border-radius:18px;ov
 #tabelaItens input{min-width:120px}.linha-item td:first-child input{min-width:260px}.card canvas{max-width:100%}
 
 .valor-financeiro{transition:all .2s ease}.card.auto{border-left-color:#D4AF37}.badge{background:#f2ead0;color:#5b4715}
+
+.btn-olho-valores{min-width:170px}.valor-financeiro{transition:all .2s ease;font-variant-numeric:tabular-nums}
+
+canvas#graficoAnual, canvas#graficoPagamento{
+  background:#fff;
+  border:1px solid #eadfbd;
+  border-radius:18px;
+  padding:8px;
+}
+
+/* V20 - pesquisa rápida em clientes e veículos */
+#pesquisaCliente, #pesquisaVeiculo, #pesquisaClienteOS, #pesquisaVeiculoOS{
+  border:2px solid #eadfbd;
+  background:#fffdf7;
+  margin-bottom:6px;
+}
+select option[hidden]{
+  display:none;
+}

@@ -30,14 +30,28 @@ document.querySelectorAll('input[type=text], textarea').forEach(el=>{
 });
 </script>
 
+
+
 <script>
 function aplicarPrivacidadeGlobal(){
   const ocultar = localStorage.getItem("ocultarValores") === "sim";
   document.querySelectorAll(".valor-financeiro").forEach(el=>{
-    if(!el.dataset.real){ el.dataset.real = el.innerText; }
-    el.innerText = ocultar ? "R$ •••••" : el.dataset.real;
+    if(!el.dataset.real || el.dataset.real.includes("•••••")){
+      el.dataset.real = el.textContent.trim();
+    }
+    el.textContent = ocultar ? "R$ •••••" : el.dataset.real;
+  });
+  document.querySelectorAll(".btn-olho-valores").forEach(btn=>{
+    btn.textContent = ocultar ? "🙈 MOSTRAR VALORES" : "👁️ OCULTAR VALORES";
   });
 }
-setTimeout(aplicarPrivacidadeGlobal, 80);
+function alternarPrivacidade(){
+  const ocultar = localStorage.getItem("ocultarValores") === "sim";
+  localStorage.setItem("ocultarValores", ocultar ? "nao" : "sim");
+  aplicarPrivacidadeGlobal();
+}
+document.addEventListener("DOMContentLoaded", aplicarPrivacidadeGlobal);
+setTimeout(aplicarPrivacidadeGlobal, 200);
 </script>
+
 </body></html>

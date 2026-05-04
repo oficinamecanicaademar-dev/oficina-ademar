@@ -1,26 +1,14 @@
 {% extends "base.html" %}{% block content %}
 <div class="card auto" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
   <h2 style="margin:0">PRIVACIDADE DOS VALORES</h2>
-  <button type="button" class="dark" onclick="alternarPrivacidade()" id="btnOlho">👁️ OCULTAR VALORES</button>
+  <button type="button" class="dark" onclick="alternarPrivacidade()" class="btn-olho-valores">👁️ OCULTAR VALORES</button>
+</div>
+<div class="card auto" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+  <h2 style="margin:0">PRIVACIDADE DOS VALORES</h2>
+  <button type="button" class="dark btn-olho-valores" onclick="alternarPrivacidade()">👁️ OCULTAR VALORES</button>
 </div>
 <div class="grid"><div class="card auto"><h2>PAINEL PRINCIPAL</h2><p class="badge">MECÂNICA EM GERAL</p><p class="total valor-financeiro" data-real="{{brl(total_mes)}}">{{brl(total_mes)}}</p><p class="muted">ENTRADAS PAGAS/PREVISTAS DO MÊS</p></div>
 <div class="card"><h2>PARCELAS PENDENTES</h2><p class="total valor-financeiro" data-real="{{brl(pendente)}}">{{brl(pendente)}}</p><a class="btn" href="/orcamentos">NOVO ORÇAMENTO</a><a class="btn dark" href="/ordens-servico">ORDEM DE SERVIÇO</a><a class="btn dark" href="/relatorios">RELATÓRIOS</a></div></div>
 <div class="card"><h2>ÚLTIMOS ORÇAMENTOS</h2><table><tr><th>ID</th><th>CLIENTE</th><th>CARRO</th><th>TOTAL</th><th>AÇÕES</th></tr>{% for o in orcs %}<tr><td>#{{o.id}}</td><td>{{o.cliente}}</td><td>{{o.carro}} {{o.placa}}</td><td>{{brl(o.total)}}</td><td><a class="btn" href="/orcamentos/editar/{{o.id}}">EDITAR</a><a class="btn dark" href="/orcamentos/pdf/{{o.id}}">PDF</a></td></tr>{% endfor %}</table></div>
 {% endblock %}
-<script>
-function aplicarPrivacidade(){
-  const ocultar = localStorage.getItem("ocultarValores") === "sim";
-  document.querySelectorAll(".valor-financeiro").forEach(el=>{
-    if(!el.dataset.real){ el.dataset.real = el.innerText; }
-    el.innerText = ocultar ? "R$ •••••" : el.dataset.real;
-  });
-  const btn = document.getElementById("btnOlho");
-  if(btn){ btn.innerText = ocultar ? "🙈 MOSTRAR VALORES" : "👁️ OCULTAR VALORES"; }
-}
-function alternarPrivacidade(){
-  const ocultar = localStorage.getItem("ocultarValores") === "sim";
-  localStorage.setItem("ocultarValores", ocultar ? "nao" : "sim");
-  aplicarPrivacidade();
-}
-aplicarPrivacidade();
-</script>
+

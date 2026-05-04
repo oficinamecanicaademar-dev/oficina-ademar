@@ -7,21 +7,141 @@
 </div>
 <div class="grid"><div class="card"><h2>RELATÓRIO MENSAL POR PAGAMENTO</h2><table><tr><th>FORMA</th><th>STATUS</th><th>QTD</th><th>TOTAL</th></tr>{% for m in mensal %}<tr><td>{{m.forma}}</td><td>{{m.status}}</td><td>{{m.qtd}}</td><td><span class="valor-financeiro" data-real="{{brl(m.total)}}">{{brl(m.total)}}</span></td></tr>{% endfor %}</table></div><div class="card"><h2>SALDO ANUAL POR MÊS</h2><table><tr><th>MÊS</th><th>SALDO</th></tr>{% for a in anual %}<tr><td>{{a.mes}}</td><td><span class="valor-financeiro" data-real="{{brl(a.saldo)}}">{{brl(a.saldo)}}</span></td></tr>{% endfor %}</table></div></div>
 <div class="card"><h2>PARCELAS PENDENTES / PREVISÃO FUTURA</h2><table><tr><th>DATA</th><th>DESCRIÇÃO</th><th>FORMA</th><th>PARCELA</th><th>VALOR</th><th>STATUS</th></tr>{% for p in parcelas %}<tr><td>{{p.data}}</td><td>{{p.descricao}}</td><td>{{p.forma}}</td><td>{{p.parcela_num}}/{{p.parcelas_total}}</td><td><span class="valor-financeiro" data-real="{{brl(p.valor)}}">{{brl(p.valor)}}</span></td><td>{{p.status}}</td></tr>{% endfor %}</table></div>{% endblock %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-const labelsAno = {{ chart_labels|tojson }};
-const valuesAno = {{ chart_values|tojson }};
-const labelsForma = {{ formas_labels|tojson }};
-const valuesForma = {{ formas_values|tojson }};
 
-new Chart(document.getElementById('graficoAnual'), {
-  type: 'bar',
-  data: { labels: labelsAno, datasets: [{ label: 'SALDO', data: valuesAno }] },
-  options: { responsive: true, plugins: { legend: { display: false } } }
-});
-new Chart(document.getElementById('graficoPagamento'), {
-  type: 'doughnut',
-  data: { labels: labelsForma, datasets: [{ label: 'TOTAL', data: valuesForma }] },
-  options: { responsive: true }
-});
+
+<script>
+(function(){
+  const labelsAno = {{ chart_labels|default([])|tojson }};
+  const valuesAno = {{ chart_values|default([])|tojson }};
+  const labelsForma = {{ formas_labels|default([])|tojson }};
+  const valuesForma = {{ formas_values|default([])|tojson }};
+
+  function moeda(v){
+    return (v || 0).toLocaleString("pt-BR", {style:"currency", currency:"BRL"});
+  }
+
+  function prepararCanvas(canvas){
+    const parentWidth = canvas.parentElement.clientWidth || 500;
+    const cssHeight = parseInt(canvas.getAttribute("height") || "190");
+    const scale = window.devicePixelRatio || 1;
+    canvas.style.width = "100%";
+    canvas.style.height = cssHeight + "px";
+    canvas.width = parentWidth * scale;
+    canvas.height = cssHeight * scale;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(scale, scale);
+    return {ctx, w: parentWidth, h: cssHeight};
+  }
+
+  function graficoBarras(id, labels, values, msgId){
+    const canvas = document.getElementById(id);
+    if(!canvas) return;
+    const msg = document.getElementById(msgId);
+    const {ctx, w, h} = prepararCanvas(canvas);
+
+    ctx.clearRect(0,0,w,h);
+    if(!values || values.length === 0){
+      if(msg) msg.innerText = "SEM DADOS PARA EXIBIR NESTE PERÍODO.";
+      return;
+    }
+    if(msg) msg.innerText = "";
+
+    const pad = 36;
+    const max = Math.max(...values.map(v => Math.abs(v)), 1);
+    const baseY = h - pad;
+    const chartH = h - pad*2;
+    const barGap = 10;
+    const barW = Math.max(18, (w - pad*2) / values.length - barGap);
+
+    ctx.strokeStyle = "#D4AF37";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pad, pad/2);
+    ctx.lineTo(pad, baseY);
+    ctx.lineTo(w-pad/2, baseY);
+    ctx.stroke();
+
+    values.forEach((val, i)=>{
+      const x = pad + i * (barW + barGap) + 8;
+      const bh = Math.max(3, Math.abs(val) / max * chartH);
+      const y = baseY - bh;
+      ctx.fillStyle = "#D4AF37";
+      ctx.fillRect(x, y, barW, bh);
+
+      ctx.fillStyle = "#333";
+      ctx.font = "10px Segoe UI, Arial";
+      ctx.textAlign = "center";
+      ctx.fillText((labels[i] || "").slice(5), x + barW/2, h - 10);
+    });
+
+    ctx.fillStyle = "#333";
+    ctx.font = "11px Segoe UI, Arial";
+    ctx.textAlign = "left";
+    ctx.fillText("MAIOR: " + moeda(max), pad, 16);
+  }
+
+  function graficoRosca(id, labels, values, msgId){
+    const canvas = document.getElementById(id);
+    if(!canvas) return;
+    const msg = document.getElementById(msgId);
+    const {ctx, w, h} = prepararCanvas(canvas);
+
+    ctx.clearRect(0,0,w,h);
+    const total = (values || []).reduce((a,b)=>a+(b||0),0);
+    if(!values || values.length === 0 || total <= 0){
+      if(msg) msg.innerText = "SEM DADOS PARA EXIBIR NESTE PERÍODO.";
+      return;
+    }
+    if(msg) msg.innerText = "";
+
+    const cx = Math.min(w*0.32, 130);
+    const cy = h/2;
+    const r = Math.min(70, h/2 - 18);
+    const cores = ["#D4AF37", "#202428", "#9B7A25", "#C9C9C9", "#6D5B22", "#8A8A8A"];
+
+    let start = -Math.PI/2;
+    values.forEach((val, i)=>{
+      const ang = (val/total) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, start, start + ang);
+      ctx.closePath();
+      ctx.fillStyle = cores[i % cores.length];
+      ctx.fill();
+      start += ang;
+    });
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, r*0.52, 0, Math.PI*2);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+
+    ctx.fillStyle = "#202428";
+    ctx.font = "bold 12px Segoe UI, Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("TOTAL", cx, cy-4);
+    ctx.font = "11px Segoe UI, Arial";
+    ctx.fillText(moeda(total), cx, cy+13);
+
+    let y = 30;
+    ctx.textAlign = "left";
+    labels.forEach((lab, i)=>{
+      const x = w*0.58;
+      ctx.fillStyle = cores[i % cores.length];
+      ctx.fillRect(x, y-10, 10, 10);
+      ctx.fillStyle = "#333";
+      ctx.font = "10px Segoe UI, Arial";
+      ctx.fillText((lab || "NÃO INFORMADO").slice(0, 24) + " - " + moeda(values[i]), x+16, y);
+      y += 22;
+    });
+  }
+
+  function desenharTudo(){
+    graficoBarras("graficoAnual", labelsAno, valuesAno, "msgGraficoAnual");
+    graficoRosca("graficoPagamento", labelsForma, valuesForma, "msgGraficoPagamento");
+  }
+
+  window.addEventListener("resize", desenharTudo);
+  desenharTudo();
+})();
 </script>

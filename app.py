@@ -592,6 +592,52 @@ def whatsapp(id):
     return redirect("https://api.whatsapp.com/send?phone=55" + numero + "&text=" + urllib.parse.quote(msg, safe=""))
 
 
+
+@app.route("/ordens-servico", methods=["GET","POST"])
+@login_required
+def ordens_servico():
+    if request.method == "POST":
+        orc_id = request.form.get("orcamento_id") or None
+        orc = fetchone("SELECT * FROM orcamentos WHERE id=:id", {"id": orc_id}) if orc_id else None
+        cliente_id = orc["cliente_id"] if orc else request.form.get("cliente_id")
+        veiculo_id = orc["veiculo_id"] if orc else request.form.get("veiculo_id")
+
+        execute("""INSERT INTO ordens_servico(orcamento_id,cliente_id,veiculo_id,data_abertura,data_fechamento,status,descricao,observacoes)
+                   VALUES(:orc,:cli,:vei,:abertura,:fechamento,:status,:descricao,:obs)""",
+                {"orc": orc_id, "cli": cliente_id, "vei": veiculo_id,
+                 "abertura": request.form.get("data_abertura") or datetime.now().strftime("%Y-%m-%d"),
+                 "fechamento": request.form.get("data_fechamento") or "",
+                 "status": normalizar(request.form.get("status","EM ANDAMENTO")),
+                 "descricao": normalizar(request.form.get("descricao","")),
+                 "obs": normalizar(request.form.get("observacoes",""))})
+        return redirect(url_for("ordens_servico"))
+
+    clientes = fetchall("SELECT * FROM clientes ORDER BY nome")
+    veiculos = fetchall("""SELECT v.*, c.nome cliente FROM veiculos v LEFT JOIN clientes c ON c.id=v.cliente_id ORDER BY c.nome""")
+    orcamentos_lista = fetchall("""SELECT o.*, c.nome cliente, v.modelo carro, v.placa placa FROM orcamentos o
+                                  LEFT JOIN clientes c ON c.id=o.cliente_id
+                                  LEFT JOIN veiculos v ON v.id=o.veiculo_id
+                                  ORDER BY o.id DESC LIMIT 200""")
+    lista = fetchall("""SELECT os.*, c.nome cliente, v.modelo carro, v.placa placa
+                        FROM ordens_servico os
+                        LEFT JOIN clientes c ON c.id=os.cliente_id
+                        LEFT JOIN veiculos v ON v.id=os.veiculo_id
+                        ORDER BY os.id DESC""")
+    return render_template("ordens_servico.html", lista=lista, clientes=clientes, veiculos=veiculos, orcamentos=orcamentos_lista)
+
+@app.route("/ordens-servico/excluir/<int:id>")
+@login_required
+def excluir_os(id):
+    execute("DELETE FROM ordens_servico WHERE id=:id", {"id": id})
+    return redirect(url_for("ordens_servico"))
+
+@app.route("/ordens-servico/status/<int:id>/<status>")
+@login_required
+def status_os(id, status):
+    execute("UPDATE ordens_servico SET status=:status WHERE id=:id", {"status": normalizar(status), "id": id})
+    return redirect(url_for("ordens_servico"))
+
+
 @app.route("/financeiro", methods=["GET","POST"])
 @login_required
 def financeiro():

@@ -8,11 +8,13 @@
     <div class="grid">
       <div>
         <label>CLIENTE</label>
-        <select name="cliente_id">{% for c in clientes %}<option value="{{c.id}}" {% if edit and edit.cliente_id==c.id %}selected{% endif %}>{{c.nome}}</option>{% endfor %}</select>
+        <input type="text" id="pesquisaCliente" placeholder="PESQUISAR CLIENTE PELO NOME OU TELEFONE..." oninput="filtrarSelect('pesquisaCliente','selectCliente')">
+        <select name="cliente_id" id="selectCliente">{% for c in clientes %}<option value="{{c.id}}" data-busca="{{c.nome}} {{c.telefone}}" {% if edit and edit.cliente_id==c.id %}selected{% endif %}>{{c.nome}} - {{c.telefone}}</option>{% endfor %}</select>
       </div>
       <div>
         <label>VEÍCULO</label>
-        <select name="veiculo_id">{% for v in veiculos %}<option value="{{v.id}}" {% if edit and edit.veiculo_id==v.id %}selected{% endif %}>{{v.cliente}} - {{v.modelo}} {{v.placa}}</option>{% endfor %}</select>
+        <input type="text" id="pesquisaVeiculo" placeholder="PESQUISAR VEÍCULO POR MODELO, PLACA OU CLIENTE..." oninput="filtrarSelect('pesquisaVeiculo','selectVeiculo')">
+        <select name="veiculo_id" id="selectVeiculo">{% for v in veiculos %}<option value="{{v.id}}" data-busca="{{v.cliente}} {{v.modelo}} {{v.placa}} {{v.km}}" {% if edit and edit.veiculo_id==v.id %}selected{% endif %}>{{v.cliente}} - {{v.modelo}} - {{v.placa}}</option>{% endfor %}</select>
       </div>
       <div><label>DATA</label><input type="date" name="data" value="{{edit.data if edit else ''}}"></div>
       <div><label>STATUS</label><select name="status"><option>ABERTO</option><option>APROVADO</option><option>FINALIZADO</option><option>CANCELADO</option></select></div>
@@ -109,6 +111,27 @@
 </div>
 
 <script>
+
+function filtrarSelect(inputId, selectId){
+  const termo = document.getElementById(inputId).value.toUpperCase().trim();
+  const select = document.getElementById(selectId);
+  let primeiroVisivel = null;
+
+  Array.from(select.options).forEach(opt=>{
+    const busca = (opt.dataset.busca || opt.textContent || "").toUpperCase();
+    const mostrar = busca.includes(termo);
+    opt.hidden = !mostrar;
+    opt.disabled = !mostrar;
+    if(mostrar && primeiroVisivel === null){
+      primeiroVisivel = opt;
+    }
+  });
+
+  if(primeiroVisivel && (select.selectedOptions.length === 0 || select.selectedOptions[0].disabled)){
+    select.value = primeiroVisivel.value;
+  }
+}
+
 function numero(v){
   v = (v || "0").toString().replaceAll(".", "").replace(",", ".");
   let n = parseFloat(v);

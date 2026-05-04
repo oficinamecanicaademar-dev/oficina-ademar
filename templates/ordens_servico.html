@@ -12,8 +12,8 @@
           {% endfor %}
         </select>
       </div>
-      <div><label>CLIENTE</label><select name="cliente_id">{% for c in clientes %}<option value="{{c.id}}">{{c.nome}}</option>{% endfor %}</select></div>
-      <div><label>VEÍCULO</label><select name="veiculo_id">{% for v in veiculos %}<option value="{{v.id}}">{{v.cliente}} - {{v.modelo}} {{v.placa}}</option>{% endfor %}</select></div>
+      <div><label>CLIENTE</label><input type="text" id="pesquisaClienteOS" placeholder="PESQUISAR CLIENTE..." oninput="filtrarSelectOS('pesquisaClienteOS','selectClienteOS')"><select name="cliente_id" id="selectClienteOS">{% for c in clientes %}<option value="{{c.id}}" data-busca="{{c.nome}} {{c.telefone}}">{{c.nome}} - {{c.telefone}}</option>{% endfor %}</select></div>
+      <div><label>VEÍCULO</label><input type="text" id="pesquisaVeiculoOS" placeholder="PESQUISAR VEÍCULO / PLACA..." oninput="filtrarSelectOS('pesquisaVeiculoOS','selectVeiculoOS')"><select name="veiculo_id" id="selectVeiculoOS">{% for v in veiculos %}<option value="{{v.id}}" data-busca="{{v.cliente}} {{v.modelo}} {{v.placa}} {{v.km}}">{{v.cliente}} - {{v.modelo}} {{v.placa}}</option>{% endfor %}</select></div>
       <div><label>DATA ABERTURA</label><input type="date" name="data_abertura"></div>
       <div><label>DATA FECHAMENTO</label><input type="date" name="data_fechamento"></div>
       <div><label>STATUS</label><select name="status"><option>EM ANDAMENTO</option><option>AGUARDANDO PEÇA</option><option>FINALIZADO</option><option>ENTREGUE</option><option>CANCELADO</option></select></div>
@@ -45,3 +45,20 @@
   </table>
 </div>
 {% endblock %}
+<script>
+function filtrarSelectOS(inputId, selectId){
+  const termo = document.getElementById(inputId).value.toUpperCase().trim();
+  const select = document.getElementById(selectId);
+  let primeiroVisivel = null;
+  Array.from(select.options).forEach(opt=>{
+    const busca = (opt.dataset.busca || opt.textContent || "").toUpperCase();
+    const mostrar = busca.includes(termo);
+    opt.hidden = !mostrar;
+    opt.disabled = !mostrar;
+    if(mostrar && primeiroVisivel === null){ primeiroVisivel = opt; }
+  });
+  if(primeiroVisivel && (select.selectedOptions.length === 0 || select.selectedOptions[0].disabled)){
+    select.value = primeiroVisivel.value;
+  }
+}
+</script>
