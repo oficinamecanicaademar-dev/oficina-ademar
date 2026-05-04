@@ -12,3 +12,5 @@ table{width:100%;border-collapse:collapse;background:white;border-radius:18px;ov
 .login{max-width:430px;margin:9vh auto}.login .logo{margin:auto}
 @media(max-width:700px){.brand h1{font-size:18px}.brand p{font-size:12px}.logo{width:54px;height:54px}nav a{flex:1;text-align:center}.wrap{margin:12px auto}.card{padding:14px}td,th{font-size:12px;padding:7px}}
 #tabelaItens input{min-width:120px}.linha-item td:first-child input{min-width:260px}.card canvas{max-width:100%}
+
+.valor-financeiro{transition:all .2s ease}.card.auto{border-left-color:#D4AF37}.badge{background:#f2ead0;color:#5b4715}

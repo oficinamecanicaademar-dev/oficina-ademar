@@ -29,4 +29,15 @@ document.querySelectorAll('input[type=text], textarea').forEach(el=>{
   el.addEventListener('input',()=>{ let p=el.selectionStart; el.value=el.value.toUpperCase(); el.selectionStart=el.selectionEnd=p; });
 });
 </script>
+
+<script>
+function aplicarPrivacidadeGlobal(){
+  const ocultar = localStorage.getItem("ocultarValores") === "sim";
+  document.querySelectorAll(".valor-financeiro").forEach(el=>{
+    if(!el.dataset.real){ el.dataset.real = el.innerText; }
+    el.innerText = ocultar ? "R$ •••••" : el.dataset.real;
+  });
+}
+setTimeout(aplicarPrivacidadeGlobal, 80);
+</script>
 </body></html>

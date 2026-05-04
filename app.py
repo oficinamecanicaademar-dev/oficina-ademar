@@ -148,6 +148,11 @@ def init_db():
         );
         """))
 
+        try:
+            con.execute(text("ALTER TABLE veiculos ADD COLUMN km VARCHAR(40)"))
+        except Exception:
+            pass
+
         row = con.execute(text("SELECT id FROM usuarios WHERE usuario=:u"), {"u": ADMIN_USER}).fetchone()
         if not row:
             con.execute(text("INSERT INTO usuarios(usuario,senha_hash) VALUES(:u,:s)"),
@@ -233,11 +238,12 @@ def excluir_cliente(id):
 @login_required
 def veiculos():
     if request.method == "POST":
-        execute("""INSERT INTO veiculos(cliente_id,modelo,placa,ano,cor)
-                   VALUES(:cliente_id,:modelo,:placa,:ano,:cor)""",
+        execute("""INSERT INTO veiculos(cliente_id,modelo,placa,ano,cor,km)
+                   VALUES(:cliente_id,:modelo,:placa,:ano,:cor,:km)""",
                 {"cliente_id": request.form["cliente_id"], "modelo": normalizar(request.form["modelo"]),
                  "placa": normalizar(request.form.get("placa","")).replace(" ",""),
-                 "ano": normalizar(request.form.get("ano","")), "cor": normalizar(request.form.get("cor",""))})
+                 "ano": normalizar(request.form.get("ano","")), "cor": normalizar(request.form.get("cor","")),
+                 "km": normalizar(request.form.get("km",""))})
         return redirect(url_for("veiculos"))
     clientes = fetchall("SELECT * FROM clientes ORDER BY nome")
     lista = fetchall("""SELECT v.*, c.nome cliente FROM veiculos v
@@ -382,111 +388,180 @@ def get_orcamento(id):
                       WHERE o.id=:id""", {"id": id})
 
 @app.route("/orcamentos/pdf/<int:id>")
-@login_required
 def pdf_orcamento(id):
     o = get_orcamento(id)
     if not o:
         return "ORÇAMENTO NÃO ENCONTRADO", 404
-    itens = carregar_itens(id)
+
+    try:
+        itens = carregar_itens(id)
+    except Exception:
+        itens = []
+
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
-    w,h = A4
-    c.setFillColor(colors.HexColor("#252B30"))
-    c.rect(0, h-4.2*cm, w, 4.2*cm, fill=1, stroke=0)
-    c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 20)
-    c.drawString(2*cm, h-1.5*cm, "AUTO MECÂNICA ADEMAR")
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(2*cm, h-2.2*cm, "MECÂNICA EM GERAL")
-    c.setFont("Helvetica", 9)
-    c.drawString(2*cm, h-2.8*cm, "RUA CONCEIÇÃO DA BARRA, 436 - SÃO SALVADOR")
-    c.drawString(2*cm, h-3.3*cm, "FIXO: 3477-7455 | WHATSAPP: (31) 98801-7455")
-    c.setFillColor(colors.HexColor("#A94343"))
-    c.roundRect(w-5.2*cm, h-2.8*cm, 3.8*cm, 1.1*cm, 8, fill=1, stroke=0)
-    c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 13)
-    c.drawCentredString(w-3.3*cm, h-2.4*cm, f"ORÇAMENTO #{id}")
+    w, h = A4
 
-    y = h-5.1*cm
-    def section(title):
-        nonlocal y
-        c.setFillColor(colors.HexColor("#F0E8E8"))
-        c.roundRect(1.6*cm, y-0.2*cm, w-3.2*cm, 0.75*cm, 6, fill=1, stroke=0)
-        c.setFillColor(colors.HexColor("#333333"))
+    def nova_pagina():
+        c.setFillColor(colors.HexColor("#202428"))
+        c.rect(0, h-4.4*cm, w, 4.4*cm, fill=1, stroke=0)
+
+        c.setFillColor(colors.HexColor("#D4AF37"))
+        c.roundRect(1.3*cm, h-3.35*cm, 2.2*cm, 2.2*cm, 12, fill=0, stroke=1)
+        c.setFont("Helvetica-Bold", 24)
+        c.drawCentredString(2.4*cm, h-2.6*cm, "A")
+
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica-Bold", 19)
+        c.drawString(4.0*cm, h-1.55*cm, "AUTO MECÂNICA ADEMAR")
+
+        c.setFillColor(colors.HexColor("#E9D89B"))
         c.setFont("Helvetica-Bold", 11)
-        c.drawString(2*cm, y, title)
-        y -= 0.85*cm
+        c.drawString(4.0*cm, h-2.15*cm, "MECÂNICA EM GERAL")
 
-    section("CLIENTE E VEÍCULO")
-    c.setFont("Helvetica", 10)
+        c.setFillColor(colors.HexColor("#D7D7D7"))
+        c.setFont("Helvetica", 8.5)
+        c.drawString(4.0*cm, h-2.72*cm, "RUA CONCEIÇÃO DA BARRA, 436 - SÃO SALVADOR")
+        c.drawString(4.0*cm, h-3.22*cm, "FIXO: 3477-7455 | WHATSAPP: (31) 98801-7455")
+
+        c.setFillColor(colors.HexColor("#D4AF37"))
+        c.roundRect(w-5.5*cm, h-2.95*cm, 4.2*cm, 1.25*cm, 10, fill=1, stroke=0)
+        c.setFillColor(colors.HexColor("#202428"))
+        c.setFont("Helvetica-Bold", 13)
+        c.drawCentredString(w-3.4*cm, h-2.48*cm, f"ORÇAMENTO #{id}")
+
+        return h - 5.2*cm
+
+    def secao(titulo, y):
+        c.setFillColor(colors.HexColor("#F3EBDD"))
+        c.roundRect(1.5*cm, y-0.2*cm, w-3.0*cm, 0.7*cm, 7, fill=1, stroke=0)
+        c.setFillColor(colors.HexColor("#202428"))
+        c.setFont("Helvetica-Bold", 10.5)
+        c.drawString(1.9*cm, y, titulo)
+        return y - 0.85*cm
+
+    def rodape():
+        c.setFillColor(colors.HexColor("#777777"))
+        c.setFont("Helvetica", 7.5)
+        c.drawCentredString(w/2, 1.15*cm, "AUTO MECÂNICA ADEMAR • MECÂNICA EM GERAL • CUIDAMOS DO SEU CARRO COMO SE FOSSE NOSSO")
+        c.setFillColor(colors.HexColor("#D4AF37"))
+        c.line(1.5*cm, 1.55*cm, w-1.5*cm, 1.55*cm)
+
+    y = nova_pagina()
+
+    # Cliente e veículo
+    y = secao("DADOS DO CLIENTE E VEÍCULO", y)
     c.setFillColor(colors.HexColor("#333333"))
-    for line in [
+    c.setFont("Helvetica", 9.5)
+    linhas_cliente = [
         f"CLIENTE: {o['cliente']}",
-        f"TELEFONE: {o['telefone']}",
+        f"TELEFONE / WHATSAPP: {o['telefone']}",
         f"VEÍCULO: {o['carro']} | PLACA: {o['placa']} | ANO: {o['ano']} | COR: {o['cor']}",
         f"DATA: {o['data']} | STATUS: {o['status']}",
-    ]:
-        c.drawString(2*cm, y, line[:115])
+    ]
+    for linha in linhas_cliente:
+        c.drawString(1.9*cm, y, linha[:120])
         y -= 0.48*cm
-    y -= 0.2*cm
 
-    section("PEÇAS E MÃO DE OBRA")
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(2*cm, y, "PEÇAS")
-    c.drawRightString(w-2*cm, y, brl(o["pecas_valor"]))
-    y -= 0.45*cm
-    c.setFont("Helvetica", 9)
+    y -= 0.25*cm
+
+    # Peças
+    y = secao("PEÇAS UTILIZADAS", y)
+    c.setFont("Helvetica-Bold", 8.5)
+    c.setFillColor(colors.HexColor("#202428"))
+    c.drawString(1.9*cm, y, "DESCRIÇÃO")
+    c.drawRightString(12.8*cm, y, "QTD")
+    c.drawRightString(15.5*cm, y, "UNITÁRIO")
+    c.drawRightString(19.1*cm, y, "TOTAL")
+    y -= 0.35*cm
+    c.setFillColor(colors.HexColor("#D4AF37"))
+    c.line(1.9*cm, y, 19.1*cm, y)
+    y -= 0.35*cm
+
+    c.setFont("Helvetica", 8.5)
+    c.setFillColor(colors.HexColor("#333333"))
     if itens:
         for item in itens:
-            linha = f"{item['descricao']} | QTD: {item['quantidade']} | UNIT.: {brl(item['valor_unitario'])} | TOTAL: {brl(item['total'])}"
-            c.drawString(2.2*cm, y, linha[:115])
-            y -= 0.35*cm
-            if y < 4*cm:
+            if y < 3.5*cm:
+                rodape()
                 c.showPage()
-                y = h-2*cm
+                y = nova_pagina()
+            c.drawString(1.9*cm, y, str(item["descricao"])[:58])
+            c.drawRightString(12.8*cm, y, str(item["quantidade"]))
+            c.drawRightString(15.5*cm, y, brl(item["valor_unitario"]))
+            c.drawRightString(19.1*cm, y, brl(item["total"]))
+            y -= 0.42*cm
     else:
-        c.drawString(2.2*cm, y, "-")
-        y -= 0.35*cm
+        c.drawString(1.9*cm, y, "SEM PEÇAS INFORMADAS")
+        y -= 0.42*cm
+
     y -= 0.25*cm
 
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(2*cm, y, "MÃO DE OBRA")
-    c.drawRightString(w-2*cm, y, brl(o["mao_obra_valor"]))
-    y -= 0.45*cm
+    # Mão de obra
+    y = secao("MÃO DE OBRA / SERVIÇOS", y)
     c.setFont("Helvetica", 9)
-    for line in (o["mao_obra_desc"] or "-").split("\n"):
-        c.drawString(2.2*cm, y, line[:100])
-        y -= 0.35*cm
-    y -= 0.25*cm
-
-    section("PAGAMENTO E TOTAL")
-    c.setFont("Helvetica", 10)
-    for line in [
-        f"DESCONTO: {brl(o['desconto'])}",
-        f"ACRÉSCIMO: {brl(o['acrescimo'])}",
-        f"PAGAMENTO: {o['pagamento']} | PARCELAS: {o['parcelas']}x DE {brl(o['valor_parcela'])}",
-        f"PRIMEIRA PARCELA: {o['primeira_parcela']}",
-    ]:
-        c.drawString(2*cm, y, line)
-        y -= 0.45*cm
-    c.setFillColor(colors.HexColor("#A94343"))
-    c.setFont("Helvetica-Bold", 17)
-    c.drawRightString(w-2*cm, y, f"TOTAL: {brl(o['total'])}")
-    y -= 0.9*cm
-
     c.setFillColor(colors.HexColor("#333333"))
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(2*cm, y, "OBSERVAÇÕES")
-    y -= 0.4*cm
-    c.setFont("Helvetica", 9)
-    c.drawString(2*cm, y, (o["observacoes"] or "-")[:105])
+    mao_desc = (o["mao_obra_desc"] or "-").split("\n")
+    for linha in mao_desc:
+        if y < 3.5*cm:
+            rodape()
+            c.showPage()
+            y = nova_pagina()
+        c.drawString(1.9*cm, y, linha[:105])
+        y -= 0.4*cm
+    y -= 0.2*cm
 
-    c.setFont("Helvetica", 8)
-    c.setFillColor(colors.HexColor("#777777"))
-    c.drawCentredString(w/2, 1.2*cm, "AUTO MECÂNICA ADEMAR • MECÂNICA EM GERAL • OBRIGADO PELA CONFIANÇA")
+    # Resumo financeiro
+    y = secao("RESUMO FINANCEIRO", y)
+    resumo = [
+        ("TOTAL DE PEÇAS", o["pecas_valor"]),
+        ("MÃO DE OBRA", o["mao_obra_valor"]),
+        ("DESCONTO", o["desconto"]),
+        ("ACRÉSCIMO", o["acrescimo"]),
+    ]
+    c.setFont("Helvetica", 9.5)
+    for nome, valor in resumo:
+        c.setFillColor(colors.HexColor("#333333"))
+        c.drawString(11.2*cm, y, nome)
+        c.drawRightString(19.1*cm, y, brl(valor))
+        y -= 0.45*cm
+
+    c.setFillColor(colors.HexColor("#202428"))
+    c.roundRect(10.8*cm, y-0.35*cm, 8.5*cm, 0.9*cm, 8, fill=1, stroke=0)
+    c.setFillColor(colors.HexColor("#D4AF37"))
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(11.2*cm, y, "TOTAL GERAL")
+    c.drawRightString(18.9*cm, y, brl(o["total"]))
+    y -= 1.2*cm
+
+    # Pagamento
+    y = secao("CONDIÇÃO DE PAGAMENTO", y)
+    c.setFillColor(colors.HexColor("#333333"))
+    c.setFont("Helvetica", 9.5)
+    c.drawString(1.9*cm, y, f"FORMA DE PAGAMENTO: {o['pagamento']}")
+    y -= 0.45*cm
+    c.drawString(1.9*cm, y, f"PARCELAMENTO: {o['parcelas']}x DE {brl(o['valor_parcela'])}")
+    y -= 0.45*cm
+    c.drawString(1.9*cm, y, f"PRIMEIRA PARCELA: {o['primeira_parcela']}")
+    y -= 0.7*cm
+
+    # Observações
+    y = secao("OBSERVAÇÕES", y)
+    c.setFont("Helvetica", 8.5)
+    obs = o["observacoes"] or "ORÇAMENTO SUJEITO À APROVAÇÃO DO CLIENTE."
+    c.drawString(1.9*cm, y, obs[:120])
+    y -= 0.8*cm
+
+    c.setFont("Helvetica-Oblique", 8)
+    c.setFillColor(colors.HexColor("#666666"))
+    c.drawString(1.9*cm, y, "Este orçamento foi elaborado com base nas informações e condições verificadas no momento da avaliação.")
+    y -= 0.35*cm
+    c.drawString(1.9*cm, y, "A execução dos serviços depende da aprovação do cliente.")
+
+    rodape()
     c.save()
     buffer.seek(0)
-    return send_file(buffer, as_attachment=False, download_name=f"ORCAMENTO_{id}.pdf", mimetype="application/pdf")
+    return send_file(buffer, as_attachment=False, download_name=f"ORCAMENTO_{id}_AUTO_MECANICA_ADEMAR.pdf", mimetype="application/pdf")
 
 @app.route("/orcamentos/whatsapp/<int:id>")
 @login_required
@@ -496,75 +571,25 @@ def whatsapp(id):
         return redirect(url_for("orcamentos"))
 
     numero = "".join(ch for ch in (o["telefone"] or "") if ch.isdigit())
-    pdf_link = f"{base_url()}/orcamentos/pdf/{id}"
+    pdf_link = f"{request.url_root.rstrip('/')}/orcamentos/pdf/{id}"
 
-    msg = f"""Olá, {o['cliente']}! 👋
+    msg = (
+        f"Olá, {o['cliente']}! 👋\n\n"
+        f"Aqui é da *Auto Mecânica Ademar* 🔧🚗\n\n"
+        f"Preparamos o orçamento do seu veículo com atenção e transparência:\n\n"
+        f"🚘 *Veículo:* {o['carro']} - placa {o['placa']}\n\n"
+        f"💰 *Valor total:* {brl(o['total'])}\n"
+        f"💳 *Forma de pagamento:* {o['pagamento']}\n"
+        f"📊 *Parcelamento:* {o['parcelas']}x de {brl(o['valor_parcela'])}\n\n"
+        f"📄 *Orçamento completo em PDF:*\n{pdf_link}\n\n"
+        f"Para aprovar o serviço, basta responder esta mensagem confirmando. 👍\n\n"
+        f"Se tiver qualquer dúvida, estamos à disposição para explicar cada item.\n\n"
+        f"Agradecemos pela confiança! 🤝\n\n"
+        f"*Auto Mecânica Ademar*\n"
+        f"_Mecânica em geral_"
+    )
 
-Aqui é da *Auto Mecânica Ademar* 🔧🚗
-
-Preparamos o orçamento do seu veículo:
-
-🚘 *Veículo:* {o['carro']} - {o['placa']}
-
-💰 *Valor total:* {brl(o['total'])}
-💳 *Forma de pagamento:* {o['pagamento']}
-📊 *Parcelamento:* {o['parcelas']}x de {brl(o['valor_parcela'])}
-
-📄 *Orçamento completo em PDF:*
-{pdf_link}
-
-Caso queira aprovar o serviço, é só responder esta mensagem 👍
-
-Agradecemos pela confiança! 🤝
-*Auto Mecânica Ademar*
-_Mecânica em geral_"""
-
-    return redirect("https://wa.me/55" + numero + "?text=" + urllib.parse.quote(msg, safe=""))
-
-
-@app.route("/ordens-servico", methods=["GET","POST"])
-@login_required
-def ordens_servico():
-    if request.method == "POST":
-        orc_id = request.form.get("orcamento_id") or None
-        orc = fetchone("SELECT * FROM orcamentos WHERE id=:id", {"id": orc_id}) if orc_id else None
-        cliente_id = orc["cliente_id"] if orc else request.form.get("cliente_id")
-        veiculo_id = orc["veiculo_id"] if orc else request.form.get("veiculo_id")
-
-        execute("""INSERT INTO ordens_servico(orcamento_id,cliente_id,veiculo_id,data_abertura,data_fechamento,status,descricao,observacoes)
-                   VALUES(:orc,:cli,:vei,:abertura,:fechamento,:status,:descricao,:obs)""",
-                {"orc": orc_id, "cli": cliente_id, "vei": veiculo_id,
-                 "abertura": request.form.get("data_abertura") or datetime.now().strftime("%Y-%m-%d"),
-                 "fechamento": request.form.get("data_fechamento") or "",
-                 "status": normalizar(request.form.get("status","EM ANDAMENTO")),
-                 "descricao": normalizar(request.form.get("descricao","")),
-                 "obs": normalizar(request.form.get("observacoes",""))})
-        return redirect(url_for("ordens_servico"))
-
-    clientes = fetchall("SELECT * FROM clientes ORDER BY nome")
-    veiculos = fetchall("""SELECT v.*, c.nome cliente FROM veiculos v LEFT JOIN clientes c ON c.id=v.cliente_id ORDER BY c.nome""")
-    orcamentos_lista = fetchall("""SELECT o.*, c.nome cliente, v.modelo carro, v.placa placa FROM orcamentos o
-                                  LEFT JOIN clientes c ON c.id=o.cliente_id
-                                  LEFT JOIN veiculos v ON v.id=o.veiculo_id
-                                  ORDER BY o.id DESC LIMIT 200""")
-    lista = fetchall("""SELECT os.*, c.nome cliente, v.modelo carro, v.placa placa
-                        FROM ordens_servico os
-                        LEFT JOIN clientes c ON c.id=os.cliente_id
-                        LEFT JOIN veiculos v ON v.id=os.veiculo_id
-                        ORDER BY os.id DESC""")
-    return render_template("ordens_servico.html", lista=lista, clientes=clientes, veiculos=veiculos, orcamentos=orcamentos_lista)
-
-@app.route("/ordens-servico/excluir/<int:id>")
-@login_required
-def excluir_os(id):
-    execute("DELETE FROM ordens_servico WHERE id=:id", {"id": id})
-    return redirect(url_for("ordens_servico"))
-
-@app.route("/ordens-servico/status/<int:id>/<status>")
-@login_required
-def status_os(id, status):
-    execute("UPDATE ordens_servico SET status=:status WHERE id=:id", {"status": normalizar(status), "id": id})
-    return redirect(url_for("ordens_servico"))
+    return redirect("https://api.whatsapp.com/send?phone=55" + numero + "&text=" + urllib.parse.quote(msg, safe=""))
 
 
 @app.route("/financeiro", methods=["GET","POST"])

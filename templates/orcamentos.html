@@ -73,7 +73,7 @@
     <div class="grid">
       <div><label>DESCONTO</label><input name="desconto" id="desconto" value="{{edit.desconto if edit else '0'}}"></div>
       <div><label>ACRÉSCIMO</label><input name="acrescimo" id="acrescimo" value="{{edit.acrescimo if edit else '0'}}"></div>
-      <div><label>PAGAMENTO</label><select name="pagamento"><option>PIX</option><option>DINHEIRO</option><option>DÉBITO</option><option>CRÉDITO</option></select></div>
+      <div><label>PAGAMENTO</label><select name="pagamento"><option>A DEFINIR</option><option>PIX</option><option>DINHEIRO</option><option>DÉBITO</option><option>CRÉDITO</option></select></div>
       <div><label>PARCELAS</label><input type="number" name="parcelas" id="parcelas" min="1" value="{{edit.parcelas if edit else '1'}}"></div>
       <div><label>PRIMEIRA PARCELA</label><input type="date" name="primeira_parcela" value="{{edit.primeira_parcela if edit else ''}}"></div>
     </div>
@@ -95,7 +95,7 @@
       <td>{{o.cliente}}</td>
       <td>{{o.carro}} {{o.placa}}</td>
       <td>{{o.pagamento}} {{o.parcelas}}x</td>
-      <td>{{brl(o.total)}}</td>
+      <td><span class="valor-financeiro" data-real="{{brl(o.total)}}">{{brl(o.total)}}</span></td>
       <td>
         <a class="btn" href="/orcamentos/editar/{{o.id}}">EDITAR</a>
         <a class="btn dark" href="/orcamentos/pdf/{{o.id}}">PDF</a>
