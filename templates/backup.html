@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% block content %}
+<div class="card auto">
+  <h2>BACKUP DOS DADOS</h2>
+  <p>Use esta área para salvar uma cópia dos dados da oficina no seu computador.</p>
+  <p class="badge">IMPORTANTE: BAIXE UM BACKUP TODO DIA OU TODA SEMANA</p>
+  <br><br>
+  <a class="btn" href="/backup">BAIXAR BACKUP AGORA</a>
+</div>
+
+<div class="card">
+  <h2>RESTAURAR BACKUP</h2>
+  <p>Use esta opção caso os dados sumam ou caso você queira voltar um backup antigo.</p>
+
+  {% if mensagem %}<p class="badge">{{mensagem}}</p>{% endif %}
+  {% if erro %}<p style="color:#a94343;font-weight:900">{{erro}}</p>{% endif %}
+
+  <form method="post" action="/restaurar-backup" enctype="multipart/form-data">
+    <label>SELECIONE O ARQUIVO .JSON DO BACKUP</label>
+    <input type="file" name="arquivo_backup" accept=".json" required>
+    <button onclick="return confirm('ATENÇÃO: ISSO VAI SUBSTITUIR OS DADOS ATUAIS PELO BACKUP. CONTINUAR?')">RESTAURAR BACKUP</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>COMO USAR COM SEGURANÇA</h2>
+  <p>1. Clique em <b>BAIXAR BACKUP AGORA</b>.</p>
+  <p>2. Guarde o arquivo em uma pasta segura no computador, pendrive ou Google Drive.</p>
+  <p>3. Se os dados sumirem, volte aqui e use <b>RESTAURAR BACKUP</b>.</p>
+</div>
+{% endblock %}

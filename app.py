@@ -1,5 +1,5 @@
 
-import os, urllib.parse
+import os, urllib.parse, json
 from datetime import datetime, timedelta
 from functools import wraps
 from io import BytesIO
@@ -690,6 +690,67 @@ def relatorios():
                            entradas=entradas, saidas=saidas, lucro=entradas-saidas, ano=ano, mes=mes,
                            chart_labels=chart_labels, chart_values=chart_values,
                            formas_labels=formas_labels, formas_values=formas_values)
+
+
+@app.route("/backup")
+@login_required
+def backup():
+    tabelas = ["clientes", "veiculos", "orcamentos", "orcamento_itens", "ordens_servico", "financeiro"]
+    dados = {}
+    for tabela in tabelas:
+        try:
+            dados[tabela] = [dict(row) for row in fetchall(f"SELECT * FROM {tabela} ORDER BY id")]
+        except Exception:
+            dados[tabela] = []
+
+    conteudo = json.dumps(dados, ensure_ascii=False, indent=2)
+    buffer = BytesIO()
+    buffer.write(conteudo.encode("utf-8"))
+    buffer.seek(0)
+
+    nome = "backup_auto_mecanica_ademar_" + datetime.now().strftime("%Y_%m_%d_%H_%M") + ".json"
+    return send_file(buffer, as_attachment=True, download_name=nome, mimetype="application/json")
+
+
+@app.route("/restaurar-backup", methods=["GET", "POST"])
+@login_required
+def restaurar_backup():
+    mensagem = None
+    erro = None
+
+    if request.method == "POST":
+        arquivo = request.files.get("arquivo_backup")
+        if not arquivo:
+            erro = "SELECIONE UM ARQUIVO DE BACKUP."
+        else:
+            try:
+                dados = json.loads(arquivo.read().decode("utf-8"))
+
+                tabelas_limpar = ["financeiro", "ordens_servico", "orcamento_itens", "orcamentos", "veiculos", "clientes"]
+
+                with engine.begin() as con:
+                    for tabela in tabelas_limpar:
+                        try:
+                            con.execute(text(f"DELETE FROM {tabela}"))
+                        except Exception:
+                            pass
+
+                    ordem_insert = ["clientes", "veiculos", "orcamentos", "orcamento_itens", "ordens_servico", "financeiro"]
+                    for tabela in ordem_insert:
+                        for item in dados.get(tabela, []):
+                            if not item:
+                                continue
+                            colunas = list(item.keys())
+                            valores = {k: item[k] for k in colunas}
+                            campos = ",".join(colunas)
+                            params = ",".join([":" + c for c in colunas])
+                            con.execute(text(f"INSERT INTO {tabela}({campos}) VALUES({params})"), valores)
+
+                mensagem = "BACKUP RESTAURADO COM SUCESSO."
+            except Exception as e:
+                erro = "ERRO AO RESTAURAR BACKUP: " + str(e)
+
+    return render_template("backup.html", mensagem=mensagem, erro=erro)
 
 if __name__ == "__main__":
     app.run(debug=True)
